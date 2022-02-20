@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "purty": "^7.0.0"
+  }
+}
