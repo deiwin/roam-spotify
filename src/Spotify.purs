@@ -1,4 +1,11 @@
-module Spotify (Token, PlaybackState(..), getPlaybackState, togglePlayback) where
+module Spotify
+  ( Token
+  , PlaybackState(..)
+  , getPlaybackState
+  , togglePlayback
+  , GetAccessTokenResponse(..)
+  , getAccessToken
+  ) where
 
 import Prelude
 import Effect.Class (class MonadEffect, liftEffect)
@@ -10,12 +17,17 @@ import Affjax (Request, Response)
 import Affjax.RequestHeader (RequestHeader(..))
 import Affjax.ResponseFormat (json)
 import Affjax.StatusCode (StatusCode(..))
+import Affjax.RequestBody (RequestBody(FormURLEncoded))
 import Data.Either (Either(..))
-import Data.MediaType.Common (applicationJSON)
+import Data.MediaType.Common (applicationJSON, applicationFormURLEncoded)
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:), printJsonDecodeError)
 import Data.Bifunctor (lmap)
 import Control.Monad.Except (ExceptT, except, mapExceptT, throwError)
-import Data.HTTP.Method (Method(PUT))
+import Data.HTTP.Method (Method(PUT, POST))
+import Data.String.Base64 as B64
+import Data.FormURLEncoded as FUE
+import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..))
 
 type Token
   = String
@@ -99,6 +111,49 @@ togglePlayback token = do
     pausePlayback token
   else
     resumePlayback token
+
+data GetAccessTokenResponse
+  = GetAccessTokenResponse
+    { accessToken :: String
+    , expiresInSeconds :: Int
+    }
+
+instance decodeJsonGetAccessTokenResponse :: DecodeJson GetAccessTokenResponse where
+  decodeJson json = do
+    obj <- decodeJson json
+    accessToken <- obj .: "access_token"
+    expiresInSeconds <- obj .: "expires_in"
+    pure $ GetAccessTokenResponse { accessToken, expiresInSeconds }
+
+getAccessToken :: String -> String -> String -> ExceptT String Aff GetAccessTokenResponse
+getAccessToken clientID clientSecret refreshToken =
+  logResult' do
+    response <- request req
+    decodeJson response.body
+      # lmap printJsonDecodeError
+      # except
+  where
+  logResult' = logResult "get access token"
+
+  req =
+    AX.defaultRequest
+      { url = "https://accounts.spotify.com/api/token"
+      , method = Left POST
+      , headers =
+        [ ContentType applicationFormURLEncoded
+        , RequestHeader "Authorization" ("Basic " <> B64.encode (clientID <> ":" <> clientSecret))
+        ]
+      , responseFormat = json
+      , content =
+        Just
+          ( FormURLEncoded
+              ( FUE.fromArray
+                  [ Tuple "grant_type" (Just "refresh_token")
+                  , Tuple "refresh_token" (Just refreshToken)
+                  ]
+              )
+          )
+      }
 
 request :: forall a. Request a -> ExceptT String Aff (Response a)
 request req = do

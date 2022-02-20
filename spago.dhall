@@ -15,15 +15,18 @@ to generate this file without the comments in this block.
   [ "aff"
   , "affjax"
   , "argonaut-codecs"
-  , "argonaut-core"
+  , "b64"
   , "bifunctors"
   , "console"
   , "effect"
   , "either"
+  , "form-urlencoded"
   , "http-methods"
+  , "maybe"
   , "media-types"
   , "prelude"
   , "transformers"
+  , "tuples"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]

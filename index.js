@@ -1079,6 +1079,7 @@ var PS = {};
   exports["runExceptT"] = runExceptT;
   exports["mapExceptT"] = mapExceptT;
   exports["except"] = except;
+  exports["functorExceptT"] = functorExceptT;
   exports["applicativeExceptT"] = applicativeExceptT;
   exports["bindExceptT"] = bindExceptT;
   exports["altExceptT"] = altExceptT;
@@ -1725,6 +1726,13 @@ var PS = {};
   };
   var toJsonType = verbJsonType(Data_Maybe.Nothing.value)(Data_Maybe.Just.create);
   var jsonEmptyObject = $foreign.fromObject(Foreign_Object.empty);
+  var caseJsonString = function (d) {
+      return function (f) {
+          return function (j) {
+              return $foreign["_caseJson"](Data_Function["const"](d), Data_Function["const"](d), Data_Function["const"](d), f, Data_Function["const"](d), Data_Function["const"](d), j);
+          };
+      };
+  };                                        
   var caseJsonObject = function (d) {
       return function (f) {
           return function (j) {
@@ -1749,6 +1757,7 @@ var PS = {};
   };
   exports["caseJsonBoolean"] = caseJsonBoolean;
   exports["caseJsonNumber"] = caseJsonNumber;
+  exports["caseJsonString"] = caseJsonString;
   exports["toObject"] = toObject;
   exports["jsonEmptyObject"] = jsonEmptyObject;
   exports["stringify"] = $foreign.stringify;
@@ -1921,10 +1930,14 @@ var PS = {};
   var Data_Maybe = $PS["Data.Maybe"];
   var Data_String_Common = $PS["Data.String.Common"];
   var Data_Traversable = $PS["Data.Traversable"];
-  var JSURI = $PS["JSURI"];
+  var JSURI = $PS["JSURI"];                
+  var FormURLEncoded = function (x) {
+      return x;
+  };
   var toArray = function (v) {
       return v;
-  };                                                                                                                 
+  };                                                 
+  var fromArray = FormURLEncoded;                                                                                    
   var encode = (function () {
       var encodePart = function (v) {
           if (v.value1 instanceof Data_Maybe.Nothing) {
@@ -1945,6 +1958,7 @@ var PS = {};
           return $16($17(toArray($18)));
       };
   })();
+  exports["fromArray"] = fromArray;
   exports["encode"] = encode;
 })(PS);
 (function(exports) {
@@ -2186,6 +2200,8 @@ var PS = {};
   };
   var print = Data_Either.either(Data_Show.show(showMethod))(unCustomMethod);
   exports["GET"] = GET;
+  exports["POST"] = POST;
+  exports["PUT"] = PUT;
   exports["print"] = print;
 })(PS);
 (function($PS) {
@@ -4420,7 +4436,8 @@ var PS = {};
               })())(Foreign_Object.lookup(str)(obj));
           };
       };
-  };                                                                                                                                                             
+  };
+  var decodeString = Data_Argonaut_Core.caseJsonString(Data_Either.Left.create(new Data_Argonaut_Decode_Error.TypeMismatch("String")))(Data_Either.Right.create);
   var decodeNumber = Data_Argonaut_Core.caseJsonNumber(Data_Either.Left.create(new Data_Argonaut_Decode_Error.TypeMismatch("Number")))(Data_Either.Right.create);
   var decodeJObject = (function () {
       var $20 = Data_Either.note(new Data_Argonaut_Decode_Error.TypeMismatch("Object"));
@@ -4446,6 +4463,7 @@ var PS = {};
   var decodeBoolean = Data_Argonaut_Core.caseJsonBoolean(Data_Either.Left.create(new Data_Argonaut_Decode_Error.TypeMismatch("Boolean")))(Data_Either.Right.create);
   exports["decodeBoolean"] = decodeBoolean;
   exports["decodeInt"] = decodeInt;
+  exports["decodeString"] = decodeString;
   exports["decodeForeignObject"] = decodeForeignObject;
   exports["getField"] = getField;
 })(PS);
@@ -4456,6 +4474,9 @@ var PS = {};
   var exports = $PS["Data.Argonaut.Decode.Class"];
   var Data_Argonaut_Decode_Decoders = $PS["Data.Argonaut.Decode.Decoders"];
   var Data_Either = $PS["Data.Either"];
+  var decodeJsonString = {
+      decodeJson: Data_Argonaut_Decode_Decoders.decodeString
+  };
   var decodeJsonJson = {
       decodeJson: Data_Either.Right.create
   };
@@ -4476,6 +4497,7 @@ var PS = {};
   exports["decodeJson"] = decodeJson;
   exports["decodeJsonBoolean"] = decodeJsonBoolean;
   exports["decodeJsonInt"] = decodeJsonInt;
+  exports["decodeJsonString"] = decodeJsonString;
   exports["decodeJsonJson"] = decodeJsonJson;
   exports["decodeForeignObject"] = decodeForeignObject;
 })(PS);
@@ -4490,6 +4512,156 @@ var PS = {};
       return Data_Argonaut_Decode_Decoders.getField(Data_Argonaut_Decode_Class.decodeJson(dictDecodeJson));
   };
   exports["getField"] = getField;
+})(PS);
+(function(exports) {
+  "use strict";
+
+  // Encode a string to its Base64 representation using Node's `Buffer` API
+  function encodeNodeImpl (str) {
+    var base64EncodedString = Buffer.from(str).toString("base64");
+
+    return base64EncodedString;
+  };
+
+  function btoaImpl (Left, Right, str) {
+    var result;
+
+    try {
+      result = Right(btoa(str));
+    }
+    catch (error) {
+      result = Left(error);
+    }
+
+    return result;
+  };
+
+  exports.encodeNodeImpl = encodeNodeImpl;
+  exports.btoaImpl       = btoaImpl;
+})(PS["Data.String.Base64"] = PS["Data.String.Base64"] || {});
+(function(exports) {
+  "use strict";                                  
+  var btoaIsDefined = typeof btoa === "function";
+
+  // This function converts a `Uint8Array` to a btoa-safe string.
+  // It does so by treating each byte as a Unicode code point value and by
+  // concatenating the corresponding characters.
+  // This means that e.g. a three-byte UTF-8 character is mapped to three
+  // different characters with code points between 0 .. U+00FF.
+  // This is also the reason why `String.fromCharCode` is perfectly safe here.
+  function uint8ArrayToBtoaSafeStringImpl (u8) {
+    var chunkSize = 0x8000; // Chunk size used for reading large arrays
+    var cs = [];
+
+    for (var i = 0; i < u8.length; i += chunkSize) {
+      cs.push(String.fromCharCode.apply(null, u8.subarray(i, i + chunkSize)));
+    }
+
+    return cs.join("");
+  };                                                     
+  exports.btoaIsDefined                  = btoaIsDefined;
+  exports.uint8ArrayToBtoaSafeStringImpl = uint8ArrayToBtoaSafeStringImpl;
+})(PS["Data.String.Base64.Internal"] = PS["Data.String.Base64.Internal"] || {});
+(function($PS) {
+  // Generated by purs version 0.14.5
+  "use strict";
+  $PS["Data.String.Base64.Internal"] = $PS["Data.String.Base64.Internal"] || {};
+  var exports = $PS["Data.String.Base64.Internal"];
+  var $foreign = $PS["Data.String.Base64.Internal"];
+  var Control_Category = $PS["Control.Category"];
+  var Data_Either = $PS["Data.Either"];
+  var Partial_Unsafe = $PS["Partial.Unsafe"];                
+  var unsafeFromRight = Data_Either.either(function (v) {
+      return Partial_Unsafe.unsafeCrashWith("This should never happen! If you see this message, please file a bug report in the `purescript-b64` issue tracker.");
+  })(Control_Category.identity(Control_Category.categoryFn));
+  var uint8ArrayToBtoaSafeString = function (u8) {
+      return $foreign.uint8ArrayToBtoaSafeStringImpl(u8);
+  };
+  exports["uint8ArrayToBtoaSafeString"] = uint8ArrayToBtoaSafeString;
+  exports["unsafeFromRight"] = unsafeFromRight;
+  exports["btoaIsDefined"] = $foreign.btoaIsDefined;
+})(PS);
+(function(exports) {
+  "use strict";
+
+  exports.encodeImpl = function (utfLabel, str) {
+    var encoder = new TextEncoder(utfLabel);
+
+    return encoder.encode(str);
+  };
+})(PS["Data.TextEncoder"] = PS["Data.TextEncoder"] || {});
+(function($PS) {
+  // Generated by purs version 0.14.5
+  "use strict";
+  $PS["Data.TextEncoder"] = $PS["Data.TextEncoder"] || {};
+  var exports = $PS["Data.TextEncoder"];
+  var $foreign = $PS["Data.TextEncoder"];
+  var Data_Show = $PS["Data.Show"];                
+  var Utf8 = (function () {
+      function Utf8() {
+
+      };
+      Utf8.value = new Utf8();
+      return Utf8;
+  })();
+  var Utf_16Be = (function () {
+      function Utf_16Be() {
+
+      };
+      Utf_16Be.value = new Utf_16Be();
+      return Utf_16Be;
+  })();
+  var Utf_16Le = (function () {
+      function Utf_16Le() {
+
+      };
+      Utf_16Le.value = new Utf_16Le();
+      return Utf_16Le;
+  })();
+  var showEncoding = {
+      show: function (v) {
+          if (v instanceof Utf8) {
+              return "utf-8";
+          };
+          if (v instanceof Utf_16Be) {
+              return "utf-16be";
+          };
+          if (v instanceof Utf_16Le) {
+              return "utf-16le";
+          };
+          throw new Error("Failed pattern match at Data.TextEncoder (line 36, column 1 - line 39, column 29): " + [ v.constructor.name ]);
+      }
+  };
+  var encode = function (encoding) {
+      return function (str) {
+          return $foreign.encodeImpl(Data_Show.show(showEncoding)(encoding), str);
+      };
+  };
+  var encodeUtf8 = encode(Utf8.value);
+  exports["encodeUtf8"] = encodeUtf8;
+})(PS);
+(function($PS) {
+  // Generated by purs version 0.14.5
+  "use strict";
+  $PS["Data.String.Base64"] = $PS["Data.String.Base64"] || {};
+  var exports = $PS["Data.String.Base64"];
+  var $foreign = $PS["Data.String.Base64"];
+  var Data_Either = $PS["Data.Either"];
+  var Data_String_Base64_Internal = $PS["Data.String.Base64.Internal"];
+  var Data_TextEncoder = $PS["Data.TextEncoder"];                
+  var encodeNode = function (s) {
+      return $foreign.encodeNodeImpl(s);
+  };
+  var btoa = function (str) {
+      return $foreign.btoaImpl(Data_Either.Left.create, Data_Either.Right.create, str);
+  };
+  var encode = function (str) {
+      if (Data_String_Base64_Internal.btoaIsDefined) {
+          return Data_String_Base64_Internal.unsafeFromRight(btoa(Data_String_Base64_Internal.uint8ArrayToBtoaSafeString(Data_TextEncoder.encodeUtf8(str))));
+      };
+      return encodeNode(str);
+  };
+  exports["encode"] = encode;
 })(PS);
 (function($PS) {
   // Generated by purs version 0.14.5
@@ -4556,6 +4728,7 @@ var PS = {};
   $PS["Spotify"] = $PS["Spotify"] || {};
   var exports = $PS["Spotify"];
   var Affjax = $PS["Affjax"];
+  var Affjax_RequestBody = $PS["Affjax.RequestBody"];
   var Affjax_RequestHeader = $PS["Affjax.RequestHeader"];
   var Affjax_ResponseFormat = $PS["Affjax.ResponseFormat"];
   var Affjax_StatusCode = $PS["Affjax.StatusCode"];
@@ -4570,7 +4743,13 @@ var PS = {};
   var Data_Boolean = $PS["Data.Boolean"];
   var Data_Either = $PS["Data.Either"];
   var Data_Eq = $PS["Data.Eq"];
+  var Data_FormURLEncoded = $PS["Data.FormURLEncoded"];
+  var Data_Functor = $PS["Data.Functor"];
+  var Data_HTTP_Method = $PS["Data.HTTP.Method"];
+  var Data_Maybe = $PS["Data.Maybe"];
   var Data_MediaType_Common = $PS["Data.MediaType.Common"];
+  var Data_String_Base64 = $PS["Data.String.Base64"];
+  var Data_Tuple = $PS["Data.Tuple"];
   var Effect_Aff = $PS["Effect.Aff"];
   var Effect_Aff_Class = $PS["Effect.Aff.Class"];
   var Effect_Class = $PS["Effect.Class"];
@@ -4584,6 +4763,15 @@ var PS = {};
       };
       return PlaybackState;
   })();
+  var GetAccessTokenResponse = (function () {
+      function GetAccessTokenResponse(value0) {
+          this.value0 = value0;
+      };
+      GetAccessTokenResponse.create = function (value0) {
+          return new GetAccessTokenResponse(value0);
+      };
+      return GetAccessTokenResponse;
+  })();
   var request = function (req) {
       return Control_Bind.bind(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff))(Effect_Aff_Class.liftAff(Effect_Aff_Class.monadAffExceptT(Effect_Aff_Class.monadAffAff))(Affjax.request(req)))(function (result) {
           return Control_Bind.bind(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff))(Control_Monad_Except_Trans.except(Effect_Aff.applicativeAff)(Data_Bifunctor.lmap(Data_Bifunctor.bifunctorEither)(Affjax.printError)(result)))(function (response) {
@@ -4593,7 +4781,7 @@ var PS = {};
               if (Data_Boolean.otherwise) {
                   return Control_Monad_Error_Class.throwError(Control_Monad_Except_Trans.monadThrowExceptT(Effect_Aff.monadAff))("Expected a 2xx response code");
               };
-              throw new Error("Failed pattern match at Spotify (line 110, column 3 - line 113, column 63): " + [ response.status.constructor.name ]);
+              throw new Error("Failed pattern match at Spotify (line 165, column 3 - line 168, column 63): " + [ response.status.constructor.name ]);
           });
       });
   };
@@ -4612,11 +4800,41 @@ var PS = {};
                               return Control_Applicative.pure((dictMonadEffect.Monad0()).Applicative0())(v1);
                           });
                       };
-                      throw new Error("Failed pattern match at Spotify (line 119, column 15 - line 125, column 23): " + [ v1.constructor.name ]);
+                      throw new Error("Failed pattern match at Spotify (line 174, column 15 - line 180, column 23): " + [ v1.constructor.name ]);
                   });
               });
           };
       };
+  };
+  var pausePlayback = function (token) {
+      var req = {
+          url: "https://api.spotify.com/v1/me/player/pause",
+          method: new Data_Either.Left(Data_HTTP_Method.PUT.value),
+          headers: [ new Affjax_RequestHeader.ContentType(Data_MediaType_Common.applicationJSON), new Affjax_RequestHeader.RequestHeader("Authorization", "Bearer " + token) ],
+          responseFormat: Affjax_ResponseFormat.json,
+          content: Affjax.defaultRequest.content,
+          password: Affjax.defaultRequest.password,
+          timeout: Affjax.defaultRequest.timeout,
+          username: Affjax.defaultRequest.username,
+          withCredentials: Affjax.defaultRequest.withCredentials
+      };
+      var logResult$prime = logResult(Effect_Aff.bindAff)(Effect_Aff.monadEffectAff)("pause playback");
+      return logResult$prime(Data_Functor["void"](Control_Monad_Except_Trans.functorExceptT(Effect_Aff.functorAff))(request(req)));
+  };
+  var resumePlayback = function (token) {
+      var req = {
+          url: "https://api.spotify.com/v1/me/player/play",
+          method: new Data_Either.Left(Data_HTTP_Method.PUT.value),
+          headers: [ new Affjax_RequestHeader.ContentType(Data_MediaType_Common.applicationJSON), new Affjax_RequestHeader.RequestHeader("Authorization", "Bearer " + token) ],
+          responseFormat: Affjax_ResponseFormat.json,
+          content: Affjax.defaultRequest.content,
+          password: Affjax.defaultRequest.password,
+          timeout: Affjax.defaultRequest.timeout,
+          username: Affjax.defaultRequest.username,
+          withCredentials: Affjax.defaultRequest.withCredentials
+      };
+      var logResult$prime = logResult(Effect_Aff.bindAff)(Effect_Aff.monadEffectAff)("resume playback");
+      return logResult$prime(Data_Functor["void"](Control_Monad_Except_Trans.functorExceptT(Effect_Aff.functorAff))(request(req)));
   };
   var decodeJsonPlaybackState = {
       decodeJson: function (json) {
@@ -4651,12 +4869,58 @@ var PS = {};
           });
       }));
   };
+  var togglePlayback = function (token) {
+      return Control_Bind.bind(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff))(getPlaybackState(token))(function (v) {
+          if (v.value0.isPlaying) {
+              return pausePlayback(token);
+          };
+          return resumePlayback(token);
+      });
+  };
+  var decodeJsonGetAccessTokenResponse = {
+      decodeJson: function (json) {
+          return Control_Bind.bind(Data_Either.bindEither)(Data_Argonaut_Decode_Class.decodeJson(Data_Argonaut_Decode_Class.decodeForeignObject(Data_Argonaut_Decode_Class.decodeJsonJson))(json))(function (obj) {
+              return Control_Bind.bind(Data_Either.bindEither)(Data_Argonaut_Decode_Combinators.getField(Data_Argonaut_Decode_Class.decodeJsonString)(obj)("access_token"))(function (accessToken) {
+                  return Control_Bind.bind(Data_Either.bindEither)(Data_Argonaut_Decode_Combinators.getField(Data_Argonaut_Decode_Class.decodeJsonInt)(obj)("expires_in"))(function (expiresInSeconds) {
+                      return Control_Applicative.pure(Data_Either.applicativeEither)(new GetAccessTokenResponse({
+                          accessToken: accessToken,
+                          expiresInSeconds: expiresInSeconds
+                      }));
+                  });
+              });
+          });
+      }
+  };
+  var getAccessToken = function (clientID) {
+      return function (clientSecret) {
+          return function (refreshToken) {
+              var req = {
+                  url: "https://accounts.spotify.com/api/token",
+                  method: new Data_Either.Left(Data_HTTP_Method.POST.value),
+                  headers: [ new Affjax_RequestHeader.ContentType(Data_MediaType_Common.applicationFormURLEncoded), new Affjax_RequestHeader.RequestHeader("Authorization", "Basic " + Data_String_Base64.encode(clientID + (":" + clientSecret))) ],
+                  responseFormat: Affjax_ResponseFormat.json,
+                  content: new Data_Maybe.Just(new Affjax_RequestBody.FormURLEncoded(Data_FormURLEncoded.fromArray([ new Data_Tuple.Tuple("grant_type", new Data_Maybe.Just("refresh_token")), new Data_Tuple.Tuple("refresh_token", new Data_Maybe.Just(refreshToken)) ]))),
+                  password: Affjax.defaultRequest.password,
+                  timeout: Affjax.defaultRequest.timeout,
+                  username: Affjax.defaultRequest.username,
+                  withCredentials: Affjax.defaultRequest.withCredentials
+              };
+              var logResult$prime = logResult(Effect_Aff.bindAff)(Effect_Aff.monadEffectAff)("get access token");
+              return logResult$prime(Control_Bind.bind(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff))(request(req))(function (response) {
+                  return Control_Monad_Except_Trans.except(Effect_Aff.applicativeAff)(Data_Bifunctor.lmap(Data_Bifunctor.bifunctorEither)(Data_Argonaut_Decode_Error.printJsonDecodeError)(Data_Argonaut_Decode_Class.decodeJson(decodeJsonGetAccessTokenResponse)(response.body)));
+              }));
+          };
+      };
+  };
   exports["getPlaybackState"] = getPlaybackState;
+  exports["togglePlayback"] = togglePlayback;
+  exports["getAccessToken"] = getAccessToken;
 })(PS);
 (function($PS) {
   "use strict";
   $PS["Main"] = $PS["Main"] || {};
   var exports = $PS["Main"];
+  var Control_Applicative = $PS["Control.Applicative"];
   var Control_Bind = $PS["Control.Bind"];
   var Control_Monad_Except_Trans = $PS["Control.Monad.Except.Trans"];
   var Data_Either = $PS["Data.Either"];
@@ -4665,8 +4929,19 @@ var PS = {};
   var Effect_Class = $PS["Effect.Class"];
   var Effect_Console = $PS["Effect.Console"];
   var Spotify = $PS["Spotify"];                
+  var refreshToken = "redacted";
+  var clientSecret = "redacted";
+  var clientID = "redacted";
   var main = Effect_Aff.launchAff_(Control_Bind.discard(Control_Bind.discardUnit)(Effect_Aff.bindAff)(Effect_Class.liftEffect(Effect_Aff.monadEffectAff)(Effect_Console.log("\ud83c\udf5d")))(function () {
-      return Control_Bind.bind(Effect_Aff.bindAff)(Control_Monad_Except_Trans.runExceptT(Spotify.getPlaybackState("BQDlVYmvUT8_s5avpjr2yY2zko3ig93zVXnBjloB11vtxZGAH9ZamCUaBrCQCFqi7510-2hcD9wLBSLS2OODzRlUxBF3rBfFJbM5tbBAAusFh1x4FFp0XoWsv7TMUT_yPL3Rep4t1iTtsVt8Qt88_lOjq0x6g2_9xHj3rw")))(function (s) {
+      return Control_Bind.bind(Effect_Aff.bindAff)(Control_Monad_Except_Trans.runExceptT(Control_Bind.bind(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff))(Spotify.getAccessToken(clientID)(clientSecret)(refreshToken))(function (v) {
+          return Control_Bind.bind(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff))(Spotify.getPlaybackState(v.value0.accessToken))(function (x) {
+              return Control_Bind.discard(Control_Bind.discardUnit)(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff))(Spotify.togglePlayback(v.value0.accessToken))(function () {
+                  return Control_Bind.discard(Control_Bind.discardUnit)(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff))(Spotify.togglePlayback(v.value0.accessToken))(function () {
+                      return Control_Applicative.pure(Control_Monad_Except_Trans.applicativeExceptT(Effect_Aff.monadAff))(x);
+                  });
+              });
+          });
+      })))(function (s) {
           if (s instanceof Data_Either.Right) {
               return Control_Bind.discard(Control_Bind.discardUnit)(Effect_Aff.bindAff)(Effect_Class.liftEffect(Effect_Aff.monadEffectAff)(Effect_Console.log(Data_Show.show(Data_Show.showInt)(s.value0.value0.progressMs))))(function () {
                   return Effect_Class.liftEffect(Effect_Aff.monadEffectAff)(Effect_Console.log(Data_Show.show(Data_Show.showBoolean)(s.value0.value0.isPlaying)));
@@ -4675,9 +4950,12 @@ var PS = {};
           if (s instanceof Data_Either.Left) {
               return Effect_Class.liftEffect(Effect_Aff.monadEffectAff)(Effect_Console.warn(s.value0));
           };
-          throw new Error("Failed pattern match at Main (line 19, column 5 - line 23, column 36): " + [ s.constructor.name ]);
+          throw new Error("Failed pattern match at Main (line 40, column 5 - line 44, column 36): " + [ s.constructor.name ]);
       });
   }));
+  exports["refreshToken"] = refreshToken;
+  exports["clientID"] = clientID;
+  exports["clientSecret"] = clientSecret;
   exports["main"] = main;
 })(PS);
 PS["Main"].main();
