@@ -28,22 +28,23 @@ import Data.String.Base64 as B64
 import Data.FormURLEncoded as FUE
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
+import Data.Time.Duration (Milliseconds(..), Seconds(..))
 
 type Token
   = String
 
 data PlaybackState
   = PlaybackState
-    { progressMs :: Int
+    { progress :: Milliseconds
     , isPlaying :: Boolean
     }
 
 instance decodeJsonPlaybackState :: DecodeJson PlaybackState where
   decodeJson json = do
     obj <- decodeJson json
-    progressMs <- obj .: "progress_ms"
+    progress <- Milliseconds <$> obj .: "progress_ms"
     isPlaying <- obj .: "is_playing"
-    pure $ PlaybackState { progressMs, isPlaying }
+    pure $ PlaybackState { progress, isPlaying }
 
 getPlaybackState :: Token -> ExceptT String Aff PlaybackState
 getPlaybackState token =
@@ -115,15 +116,15 @@ togglePlayback token = do
 data GetAccessTokenResponse
   = GetAccessTokenResponse
     { accessToken :: String
-    , expiresInSeconds :: Int
+    , expiresIn :: Seconds
     }
 
 instance decodeJsonGetAccessTokenResponse :: DecodeJson GetAccessTokenResponse where
   decodeJson json = do
     obj <- decodeJson json
     accessToken <- obj .: "access_token"
-    expiresInSeconds <- obj .: "expires_in"
-    pure $ GetAccessTokenResponse { accessToken, expiresInSeconds }
+    expiresIn <- Seconds <$> obj .: "expires_in"
+    pure $ GetAccessTokenResponse { accessToken, expiresIn }
 
 getAccessToken :: String -> String -> String -> ExceptT String Aff GetAccessTokenResponse
 getAccessToken clientID clientSecret refreshToken =

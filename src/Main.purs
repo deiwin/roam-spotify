@@ -39,6 +39,6 @@ main =
         pure x
     case s of
       Right (PlaybackState ps) -> do
-        liftEffect $ log $ show ps.progressMs
+        liftEffect $ log $ show ps.progress
         liftEffect $ log $ show ps.isPlaying
       Left e -> liftEffect $ warn e

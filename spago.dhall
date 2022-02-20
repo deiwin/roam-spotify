@@ -18,6 +18,7 @@ to generate this file without the comments in this block.
   , "b64"
   , "bifunctors"
   , "console"
+  , "datetime"
   , "effect"
   , "either"
   , "form-urlencoded"
