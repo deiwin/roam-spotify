@@ -3886,7 +3886,6 @@ var PS = {};
   exports["nonCanceler"] = nonCanceler;
   exports["functorAff"] = functorAff;
   exports["applicativeAff"] = applicativeAff;
-  exports["bindAff"] = bindAff;
   exports["monadAff"] = monadAff;
   exports["monadErrorAff"] = monadErrorAff;
   exports["monadEffectAff"] = monadEffectAff;
@@ -5087,27 +5086,73 @@ var PS = {};
 })(PS);
 (function($PS) {
   "use strict";
-  $PS["Spotify"] = $PS["Spotify"] || {};
-  var exports = $PS["Spotify"];
+  $PS["Spotify.Util"] = $PS["Spotify.Util"] || {};
+  var exports = $PS["Spotify.Util"];
   var Affjax = $PS["Affjax"];
-  var Affjax_RequestBody = $PS["Affjax.RequestBody"];
-  var Affjax_RequestHeader = $PS["Affjax.RequestHeader"];
-  var Affjax_ResponseFormat = $PS["Affjax.ResponseFormat"];
-  var Affjax_StatusCode = $PS["Affjax.StatusCode"];
   var Control_Applicative = $PS["Control.Applicative"];
   var Control_Bind = $PS["Control.Bind"];
   var Control_Monad_Error_Class = $PS["Control.Monad.Error.Class"];
   var Control_Monad_Except_Trans = $PS["Control.Monad.Except.Trans"];
+  var Data_Bifunctor = $PS["Data.Bifunctor"];
+  var Data_Boolean = $PS["Data.Boolean"];
+  var Data_Either = $PS["Data.Either"];
+  var Effect_Aff = $PS["Effect.Aff"];
+  var Effect_Aff_Class = $PS["Effect.Aff.Class"];
+  var Effect_Class = $PS["Effect.Class"];
+  var Effect_Console = $PS["Effect.Console"];                
+  var request = function (req) {
+      return Control_Bind.bind(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff))(Effect_Aff_Class.liftAff(Effect_Aff_Class.monadAffExceptT(Effect_Aff_Class.monadAffAff))(Affjax.request(req)))(function (result) {
+          return Control_Bind.bind(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff))(Control_Monad_Except_Trans.except(Effect_Aff.applicativeAff)(Data_Bifunctor.lmap(Data_Bifunctor.bifunctorEither)(Affjax.printError)(result)))(function (response) {
+              if (response.status >= 200 && response.status < 300) {
+                  return Control_Applicative.pure(Control_Monad_Except_Trans.applicativeExceptT(Effect_Aff.monadAff))(response);
+              };
+              if (Data_Boolean.otherwise) {
+                  return Control_Monad_Error_Class.throwError(Control_Monad_Except_Trans.monadThrowExceptT(Effect_Aff.monadAff))("Expected a 2xx response code");
+              };
+              throw new Error("Failed pattern match at Spotify.Util (line 25, column 3 - line 28, column 63): " + [ response.status.constructor.name ]);
+          });
+      });
+  };
+  var logResult = function (dictMonadEffect) {
+      return function (description) {
+          return Control_Monad_Except_Trans.mapExceptT(function (v) {
+              return Control_Bind.bind((dictMonadEffect.Monad0()).Bind1())(v)(function (v1) {
+                  if (v1 instanceof Data_Either.Left) {
+                      return Control_Bind.discard(Control_Bind.discardUnit)((dictMonadEffect.Monad0()).Bind1())(Effect_Class.liftEffect(dictMonadEffect)(Effect_Console.warn("Failed to " + (description + (": " + v1.value0)))))(function () {
+                          return Control_Applicative.pure((dictMonadEffect.Monad0()).Applicative0())(v1);
+                      });
+                  };
+                  if (v1 instanceof Data_Either.Right) {
+                      return Control_Bind.discard(Control_Bind.discardUnit)((dictMonadEffect.Monad0()).Bind1())(Effect_Class.liftEffect(dictMonadEffect)(Effect_Console.log("Succeeded to " + description)))(function () {
+                          return Control_Applicative.pure((dictMonadEffect.Monad0()).Applicative0())(v1);
+                      });
+                  };
+                  throw new Error("Failed pattern match at Spotify.Util (line 34, column 15 - line 40, column 23): " + [ v1.constructor.name ]);
+              });
+          });
+      };
+  };
+  exports["request"] = request;
+  exports["logResult"] = logResult;
+})(PS);
+(function($PS) {
+  "use strict";
+  $PS["Spotify.Auth"] = $PS["Spotify.Auth"] || {};
+  var exports = $PS["Spotify.Auth"];
+  var Affjax = $PS["Affjax"];
+  var Affjax_RequestBody = $PS["Affjax.RequestBody"];
+  var Affjax_RequestHeader = $PS["Affjax.RequestHeader"];
+  var Affjax_ResponseFormat = $PS["Affjax.ResponseFormat"];
+  var Control_Applicative = $PS["Control.Applicative"];
+  var Control_Bind = $PS["Control.Bind"];
+  var Control_Monad_Except_Trans = $PS["Control.Monad.Except.Trans"];
   var Control_Monad_Reader_Class = $PS["Control.Monad.Reader.Class"];
   var Control_Monad_Reader_Trans = $PS["Control.Monad.Reader.Trans"];
-  var Control_Monad_Trans_Class = $PS["Control.Monad.Trans.Class"];
   var Data_Argonaut_Decode_Class = $PS["Data.Argonaut.Decode.Class"];
   var Data_Argonaut_Decode_Combinators = $PS["Data.Argonaut.Decode.Combinators"];
   var Data_Argonaut_Decode_Error = $PS["Data.Argonaut.Decode.Error"];
   var Data_Bifunctor = $PS["Data.Bifunctor"];
-  var Data_Boolean = $PS["Data.Boolean"];
   var Data_Either = $PS["Data.Either"];
-  var Data_Eq = $PS["Data.Eq"];
   var Data_FormURLEncoded = $PS["Data.FormURLEncoded"];
   var Data_Functor = $PS["Data.Functor"];
   var Data_HTTP_Method = $PS["Data.HTTP.Method"];
@@ -5122,7 +5167,8 @@ var PS = {};
   var Effect_Aff_Class = $PS["Effect.Aff.Class"];
   var Effect_Class = $PS["Effect.Class"];
   var Effect_Console = $PS["Effect.Console"];
-  var Effect_Ref = $PS["Effect.Ref"];                
+  var Effect_Ref = $PS["Effect.Ref"];
+  var Spotify_Util = $PS["Spotify.Util"];                
   var TokenResponse = (function () {
       function TokenResponse(value0) {
           this.value0 = value0;
@@ -5131,15 +5177,6 @@ var PS = {};
           return new TokenResponse(value0);
       };
       return TokenResponse;
-  })();
-  var PlaybackState = (function () {
-      function PlaybackState(value0) {
-          this.value0 = value0;
-      };
-      PlaybackState.create = function (value0) {
-          return new PlaybackState(value0);
-      };
-      return PlaybackState;
   })();
   var Env = (function () {
       function Env(value0) {
@@ -5159,125 +5196,10 @@ var PS = {};
       };
       return Config;
   })();
-  var request = function (req) {
-      return Control_Bind.bind(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff))(Effect_Aff_Class.liftAff(Effect_Aff_Class.monadAffExceptT(Effect_Aff_Class.monadAffAff))(Affjax.request(req)))(function (result) {
-          return Control_Bind.bind(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff))(Control_Monad_Except_Trans.except(Effect_Aff.applicativeAff)(Data_Bifunctor.lmap(Data_Bifunctor.bifunctorEither)(Affjax.printError)(result)))(function (response) {
-              if (response.status >= 200 && response.status < 300) {
-                  return Control_Applicative.pure(Control_Monad_Except_Trans.applicativeExceptT(Effect_Aff.monadAff))(response);
-              };
-              if (Data_Boolean.otherwise) {
-                  return Control_Monad_Error_Class.throwError(Control_Monad_Except_Trans.monadThrowExceptT(Effect_Aff.monadAff))("Expected a 2xx response code");
-              };
-              throw new Error("Failed pattern match at Spotify (line 213, column 3 - line 216, column 63): " + [ response.status.constructor.name ]);
-          });
-      });
-  };
-  var logResult = function (dictBind) {
-      return function (dictMonadEffect) {
-          return function (description) {
-              return Control_Monad_Except_Trans.mapExceptT(function (v) {
-                  return Control_Bind.bind(dictBind)(v)(function (v1) {
-                      if (v1 instanceof Data_Either.Left) {
-                          return Control_Bind.discard(Control_Bind.discardUnit)(dictBind)(Effect_Class.liftEffect(dictMonadEffect)(Effect_Console.warn("Failed to " + (description + (": " + v1.value0)))))(function () {
-                              return Control_Applicative.pure((dictMonadEffect.Monad0()).Applicative0())(v1);
-                          });
-                      };
-                      if (v1 instanceof Data_Either.Right) {
-                          return Control_Bind.discard(Control_Bind.discardUnit)(dictBind)(Effect_Class.liftEffect(dictMonadEffect)(Effect_Console.log("Succeeded to " + description)))(function () {
-                              return Control_Applicative.pure((dictMonadEffect.Monad0()).Applicative0())(v1);
-                          });
-                      };
-                      throw new Error("Failed pattern match at Spotify (line 228, column 15 - line 234, column 23): " + [ v1.constructor.name ]);
-                  });
-              });
-          };
-      };
-  };
   var getToken = Control_Bind.bind(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff)))(Control_Monad_Reader_Class.ask(Control_Monad_Reader_Trans.monadAskReaderT(Control_Monad_Except_Trans.monadExceptT(Effect_Aff.monadAff))))(function (v) {
       return Control_Bind.bind(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff)))(Effect_Class.liftEffect(Control_Monad_Reader_Trans.monadEffectReader(Control_Monad_Except_Trans.monadEffectExceptT(Effect_Aff.monadEffectAff)))(Effect_Ref.read(v.value0.tokenResponseRef)))(function (v1) {
           return Control_Applicative.pure(Control_Monad_Reader_Trans.applicativeReaderT(Control_Monad_Except_Trans.applicativeExceptT(Effect_Aff.monadAff)))(v1.value0.accessToken);
       });
-  });
-  var pausePlayback = (function () {
-      var req = function (token) {
-          return {
-              url: "https://api.spotify.com/v1/me/player/pause",
-              method: new Data_Either.Left(Data_HTTP_Method.PUT.value),
-              headers: [ new Affjax_RequestHeader.ContentType(Data_MediaType_Common.applicationJSON), new Affjax_RequestHeader.RequestHeader("Authorization", "Bearer " + token) ],
-              responseFormat: Affjax_ResponseFormat.json,
-              content: Affjax.defaultRequest.content,
-              password: Affjax.defaultRequest.password,
-              timeout: Affjax.defaultRequest.timeout,
-              username: Affjax.defaultRequest.username,
-              withCredentials: Affjax.defaultRequest.withCredentials
-          };
-      };
-      var logResult$prime = Control_Monad_Reader_Trans.mapReaderT(logResult(Effect_Aff.bindAff)(Effect_Aff.monadEffectAff)("pause playback"));
-      return logResult$prime(Control_Bind.bind(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff)))(getToken)(function (token) {
-          return Data_Functor["void"](Control_Monad_Reader_Trans.functorReaderT(Control_Monad_Except_Trans.functorExceptT(Effect_Aff.functorAff)))(Control_Monad_Trans_Class.lift(Control_Monad_Reader_Trans.monadTransReaderT)(Control_Monad_Except_Trans.monadExceptT(Effect_Aff.monadAff))(request(req(token))));
-      }));
-  })();
-  var resumePlayback = (function () {
-      var req = function (token) {
-          return {
-              url: "https://api.spotify.com/v1/me/player/play",
-              method: new Data_Either.Left(Data_HTTP_Method.PUT.value),
-              headers: [ new Affjax_RequestHeader.ContentType(Data_MediaType_Common.applicationJSON), new Affjax_RequestHeader.RequestHeader("Authorization", "Bearer " + token) ],
-              responseFormat: Affjax_ResponseFormat.json,
-              content: Affjax.defaultRequest.content,
-              password: Affjax.defaultRequest.password,
-              timeout: Affjax.defaultRequest.timeout,
-              username: Affjax.defaultRequest.username,
-              withCredentials: Affjax.defaultRequest.withCredentials
-          };
-      };
-      var logResult$prime = Control_Monad_Reader_Trans.mapReaderT(logResult(Effect_Aff.bindAff)(Effect_Aff.monadEffectAff)("resume playback"));
-      return logResult$prime(Control_Bind.bind(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff)))(getToken)(function (token) {
-          return Data_Functor["void"](Control_Monad_Reader_Trans.functorReaderT(Control_Monad_Except_Trans.functorExceptT(Effect_Aff.functorAff)))(Control_Monad_Trans_Class.lift(Control_Monad_Reader_Trans.monadTransReaderT)(Control_Monad_Except_Trans.monadExceptT(Effect_Aff.monadAff))(request(req(token))));
-      }));
-  })();
-  var decodeJsonPlaybackState = {
-      decodeJson: function (json) {
-          return Control_Bind.bind(Data_Either.bindEither)(Data_Argonaut_Decode_Class.decodeJson(Data_Argonaut_Decode_Class.decodeForeignObject(Data_Argonaut_Decode_Class.decodeJsonJson))(json))(function (obj) {
-              return Control_Bind.bind(Data_Either.bindEither)(Data_Functor.map(Data_Either.functorEither)(Data_Time_Duration.Milliseconds)(Data_Argonaut_Decode_Combinators.getField(Data_Argonaut_Decode_Class.decodeJsonNumber)(obj)("progress_ms")))(function (progress) {
-                  return Control_Bind.bind(Data_Either.bindEither)(Data_Argonaut_Decode_Combinators.getField(Data_Argonaut_Decode_Class.decodeJsonBoolean)(obj)("is_playing"))(function (isPlaying) {
-                      return Control_Applicative.pure(Data_Either.applicativeEither)(new PlaybackState({
-                          progress: progress,
-                          isPlaying: isPlaying
-                      }));
-                  });
-              });
-          });
-      }
-  };
-  var getPlaybackState = (function () {
-      var req = function (token) {
-          return {
-              url: "https://api.spotify.com/v1/me/player",
-              headers: [ new Affjax_RequestHeader.ContentType(Data_MediaType_Common.applicationJSON), new Affjax_RequestHeader.RequestHeader("Authorization", "Bearer " + token) ],
-              responseFormat: Affjax_ResponseFormat.json,
-              content: Affjax.defaultRequest.content,
-              method: Affjax.defaultRequest.method,
-              password: Affjax.defaultRequest.password,
-              timeout: Affjax.defaultRequest.timeout,
-              username: Affjax.defaultRequest.username,
-              withCredentials: Affjax.defaultRequest.withCredentials
-          };
-      };
-      var logResult$prime = Control_Monad_Reader_Trans.mapReaderT(logResult(Effect_Aff.bindAff)(Effect_Aff.monadEffectAff)("get playback state"));
-      return logResult$prime(Control_Bind.bind(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff)))(getToken)(function (token) {
-          return Control_Bind.bind(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff)))(Control_Monad_Trans_Class.lift(Control_Monad_Reader_Trans.monadTransReaderT)(Control_Monad_Except_Trans.monadExceptT(Effect_Aff.monadAff))(request(req(token))))(function (response) {
-              return Control_Bind.discard(Control_Bind.discardUnit)(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff)))(Control_Applicative.when(Control_Monad_Reader_Trans.applicativeReaderT(Control_Monad_Except_Trans.applicativeExceptT(Effect_Aff.monadAff)))(Data_Eq.eq(Affjax_StatusCode.eqStatusCode)(response.status)(204))(Control_Monad_Error_Class.throwError(Control_Monad_Reader_Trans.monadThrowReaderT(Control_Monad_Except_Trans.monadThrowExceptT(Effect_Aff.monadAff)))("Received empty playback state")))(function () {
-                  return Control_Monad_Trans_Class.lift(Control_Monad_Reader_Trans.monadTransReaderT)(Control_Monad_Except_Trans.monadExceptT(Effect_Aff.monadAff))(Control_Monad_Except_Trans.except(Effect_Aff.applicativeAff)(Data_Bifunctor.lmap(Data_Bifunctor.bifunctorEither)(Data_Argonaut_Decode_Error.printJsonDecodeError)(Data_Argonaut_Decode_Class.decodeJson(decodeJsonPlaybackState)(response.body))));
-              });
-          });
-      }));
-  })();
-  var togglePlayback = Control_Bind.bind(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff)))(getPlaybackState)(function (v) {
-      if (v.value0.isPlaying) {
-          return pausePlayback;
-      };
-      return resumePlayback;
   });
   var decodeJsonGetAccessTokenResponse = {
       decodeJson: function (json) {
@@ -5305,8 +5227,8 @@ var PS = {};
           username: Affjax.defaultRequest.username,
           withCredentials: Affjax.defaultRequest.withCredentials
       };
-      var logResult$prime = logResult(Effect_Aff.bindAff)(Effect_Aff.monadEffectAff)("get access token");
-      return logResult$prime(Control_Bind.bind(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff))(request(req))(function (response) {
+      var logResult$prime = Spotify_Util.logResult(Effect_Aff.monadEffectAff)("get access token");
+      return logResult$prime(Control_Bind.bind(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff))(Spotify_Util.request(req))(function (response) {
           return Control_Monad_Except_Trans.except(Effect_Aff.applicativeAff)(Data_Bifunctor.lmap(Data_Bifunctor.bifunctorEither)(Data_Argonaut_Decode_Error.printJsonDecodeError)(Data_Argonaut_Decode_Class.decodeJson(decodeJsonGetAccessTokenResponse)(response.body)));
       }));
   };
@@ -5343,9 +5265,128 @@ var PS = {};
           });
       });
   };
-  exports["togglePlayback"] = togglePlayback;
   exports["Config"] = Config;
   exports["withToken"] = withToken;
+  exports["getToken"] = getToken;
+})(PS);
+(function($PS) {
+  "use strict";
+  $PS["Spotify"] = $PS["Spotify"] || {};
+  var exports = $PS["Spotify"];
+  var Affjax = $PS["Affjax"];
+  var Affjax_RequestHeader = $PS["Affjax.RequestHeader"];
+  var Affjax_ResponseFormat = $PS["Affjax.ResponseFormat"];
+  var Affjax_StatusCode = $PS["Affjax.StatusCode"];
+  var Control_Applicative = $PS["Control.Applicative"];
+  var Control_Bind = $PS["Control.Bind"];
+  var Control_Monad_Error_Class = $PS["Control.Monad.Error.Class"];
+  var Control_Monad_Except_Trans = $PS["Control.Monad.Except.Trans"];
+  var Control_Monad_Reader_Trans = $PS["Control.Monad.Reader.Trans"];
+  var Control_Monad_Trans_Class = $PS["Control.Monad.Trans.Class"];
+  var Data_Argonaut_Decode_Class = $PS["Data.Argonaut.Decode.Class"];
+  var Data_Argonaut_Decode_Combinators = $PS["Data.Argonaut.Decode.Combinators"];
+  var Data_Argonaut_Decode_Error = $PS["Data.Argonaut.Decode.Error"];
+  var Data_Bifunctor = $PS["Data.Bifunctor"];
+  var Data_Either = $PS["Data.Either"];
+  var Data_Eq = $PS["Data.Eq"];
+  var Data_Functor = $PS["Data.Functor"];
+  var Data_HTTP_Method = $PS["Data.HTTP.Method"];
+  var Data_MediaType_Common = $PS["Data.MediaType.Common"];
+  var Data_Time_Duration = $PS["Data.Time.Duration"];
+  var Effect_Aff = $PS["Effect.Aff"];
+  var Spotify_Auth = $PS["Spotify.Auth"];
+  var Spotify_Util = $PS["Spotify.Util"];                
+  var PlaybackState = (function () {
+      function PlaybackState(value0) {
+          this.value0 = value0;
+      };
+      PlaybackState.create = function (value0) {
+          return new PlaybackState(value0);
+      };
+      return PlaybackState;
+  })();
+  var resumePlayback = (function () {
+      var req = function (token) {
+          return {
+              url: "https://api.spotify.com/v1/me/player/play",
+              method: new Data_Either.Left(Data_HTTP_Method.PUT.value),
+              headers: [ new Affjax_RequestHeader.ContentType(Data_MediaType_Common.applicationJSON), new Affjax_RequestHeader.RequestHeader("Authorization", "Bearer " + token) ],
+              responseFormat: Affjax_ResponseFormat.json,
+              content: Affjax.defaultRequest.content,
+              password: Affjax.defaultRequest.password,
+              timeout: Affjax.defaultRequest.timeout,
+              username: Affjax.defaultRequest.username,
+              withCredentials: Affjax.defaultRequest.withCredentials
+          };
+      };
+      var logResult$prime = Control_Monad_Reader_Trans.mapReaderT(Spotify_Util.logResult(Effect_Aff.monadEffectAff)("resume playback"));
+      return logResult$prime(Control_Bind.bind(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff)))(Spotify_Auth.getToken)(function (token) {
+          return Data_Functor["void"](Control_Monad_Reader_Trans.functorReaderT(Control_Monad_Except_Trans.functorExceptT(Effect_Aff.functorAff)))(Control_Monad_Trans_Class.lift(Control_Monad_Reader_Trans.monadTransReaderT)(Control_Monad_Except_Trans.monadExceptT(Effect_Aff.monadAff))(Spotify_Util.request(req(token))));
+      }));
+  })();
+  var pausePlayback = (function () {
+      var req = function (token) {
+          return {
+              url: "https://api.spotify.com/v1/me/player/pause",
+              method: new Data_Either.Left(Data_HTTP_Method.PUT.value),
+              headers: [ new Affjax_RequestHeader.ContentType(Data_MediaType_Common.applicationJSON), new Affjax_RequestHeader.RequestHeader("Authorization", "Bearer " + token) ],
+              responseFormat: Affjax_ResponseFormat.json,
+              content: Affjax.defaultRequest.content,
+              password: Affjax.defaultRequest.password,
+              timeout: Affjax.defaultRequest.timeout,
+              username: Affjax.defaultRequest.username,
+              withCredentials: Affjax.defaultRequest.withCredentials
+          };
+      };
+      var logResult$prime = Control_Monad_Reader_Trans.mapReaderT(Spotify_Util.logResult(Effect_Aff.monadEffectAff)("pause playback"));
+      return logResult$prime(Control_Bind.bind(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff)))(Spotify_Auth.getToken)(function (token) {
+          return Data_Functor["void"](Control_Monad_Reader_Trans.functorReaderT(Control_Monad_Except_Trans.functorExceptT(Effect_Aff.functorAff)))(Control_Monad_Trans_Class.lift(Control_Monad_Reader_Trans.monadTransReaderT)(Control_Monad_Except_Trans.monadExceptT(Effect_Aff.monadAff))(Spotify_Util.request(req(token))));
+      }));
+  })();
+  var decodeJsonPlaybackState = {
+      decodeJson: function (json) {
+          return Control_Bind.bind(Data_Either.bindEither)(Data_Argonaut_Decode_Class.decodeJson(Data_Argonaut_Decode_Class.decodeForeignObject(Data_Argonaut_Decode_Class.decodeJsonJson))(json))(function (obj) {
+              return Control_Bind.bind(Data_Either.bindEither)(Data_Functor.map(Data_Either.functorEither)(Data_Time_Duration.Milliseconds)(Data_Argonaut_Decode_Combinators.getField(Data_Argonaut_Decode_Class.decodeJsonNumber)(obj)("progress_ms")))(function (progress) {
+                  return Control_Bind.bind(Data_Either.bindEither)(Data_Argonaut_Decode_Combinators.getField(Data_Argonaut_Decode_Class.decodeJsonBoolean)(obj)("is_playing"))(function (isPlaying) {
+                      return Control_Applicative.pure(Data_Either.applicativeEither)(new PlaybackState({
+                          progress: progress,
+                          isPlaying: isPlaying
+                      }));
+                  });
+              });
+          });
+      }
+  };
+  var getPlaybackState = (function () {
+      var req = function (token) {
+          return {
+              url: "https://api.spotify.com/v1/me/player",
+              headers: [ new Affjax_RequestHeader.ContentType(Data_MediaType_Common.applicationJSON), new Affjax_RequestHeader.RequestHeader("Authorization", "Bearer " + token) ],
+              responseFormat: Affjax_ResponseFormat.json,
+              content: Affjax.defaultRequest.content,
+              method: Affjax.defaultRequest.method,
+              password: Affjax.defaultRequest.password,
+              timeout: Affjax.defaultRequest.timeout,
+              username: Affjax.defaultRequest.username,
+              withCredentials: Affjax.defaultRequest.withCredentials
+          };
+      };
+      var logResult$prime = Control_Monad_Reader_Trans.mapReaderT(Spotify_Util.logResult(Effect_Aff.monadEffectAff)("get playback state"));
+      return logResult$prime(Control_Bind.bind(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff)))(Spotify_Auth.getToken)(function (token) {
+          return Control_Bind.bind(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff)))(Control_Monad_Trans_Class.lift(Control_Monad_Reader_Trans.monadTransReaderT)(Control_Monad_Except_Trans.monadExceptT(Effect_Aff.monadAff))(Spotify_Util.request(req(token))))(function (response) {
+              return Control_Bind.discard(Control_Bind.discardUnit)(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff)))(Control_Applicative.when(Control_Monad_Reader_Trans.applicativeReaderT(Control_Monad_Except_Trans.applicativeExceptT(Effect_Aff.monadAff)))(Data_Eq.eq(Affjax_StatusCode.eqStatusCode)(response.status)(204))(Control_Monad_Error_Class.throwError(Control_Monad_Reader_Trans.monadThrowReaderT(Control_Monad_Except_Trans.monadThrowExceptT(Effect_Aff.monadAff)))("Received empty playback state")))(function () {
+                  return Control_Monad_Trans_Class.lift(Control_Monad_Reader_Trans.monadTransReaderT)(Control_Monad_Except_Trans.monadExceptT(Effect_Aff.monadAff))(Control_Monad_Except_Trans.except(Effect_Aff.applicativeAff)(Data_Bifunctor.lmap(Data_Bifunctor.bifunctorEither)(Data_Argonaut_Decode_Error.printJsonDecodeError)(Data_Argonaut_Decode_Class.decodeJson(decodeJsonPlaybackState)(response.body))));
+              });
+          });
+      }));
+  })();
+  var togglePlayback = Control_Bind.bind(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff)))(getPlaybackState)(function (v) {
+      if (v.value0.isPlaying) {
+          return pausePlayback;
+      };
+      return resumePlayback;
+  });
+  exports["togglePlayback"] = togglePlayback;
 })(PS);
 (function($PS) {
   "use strict";
@@ -5357,27 +5398,27 @@ var PS = {};
   var Data_Functor = $PS["Data.Functor"];
   var Effect_Aff = $PS["Effect.Aff"];
   var Effect_Aff_Class = $PS["Effect.Aff.Class"];
-  var Effect_Class = $PS["Effect.Class"];
-  var Effect_Console = $PS["Effect.Console"];
-  var Spotify = $PS["Spotify"];                
-  var config = new Spotify.Config({
+  var Spotify = $PS["Spotify"];
+  var Spotify_Auth = $PS["Spotify.Auth"];                
+  var config = new Spotify_Auth.Config({
       clientID: "redacted",
       clientSecret: "redacted",
       refreshToken: "redacted"
   });
-  var main = (function () {
-      var program = Control_Bind.discard(Control_Bind.discardUnit)(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff)))(Spotify.togglePlayback)(function () {
-          return Spotify.togglePlayback;
-      });
-      return Effect_Aff.launchAff_(Control_Bind.discard(Control_Bind.discardUnit)(Effect_Aff.bindAff)(Effect_Class.liftEffect(Effect_Aff.monadEffectAff)(Effect_Console.log("\ud83c\udf5d")))(function () {
-          return Control_Monad_Except_Trans.runExceptT(Control_Bind.bind(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff))(Spotify.withToken(config))(function (v) {
-              return Control_Bind.discard(Control_Bind.discardUnit)(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff))(Control_Monad_Reader_Trans.runReaderT(program)(v.value0))(function () {
+  var runProgram = function (dictDiscard) {
+      return function (program) {
+          return Effect_Aff.launchAff_(Control_Monad_Except_Trans.runExceptT(Control_Bind.bind(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff))(Spotify_Auth.withToken(config))(function (v) {
+              return Control_Bind.discard(dictDiscard)(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff))(Control_Monad_Reader_Trans.runReaderT(program)(v.value0))(function () {
                   return Data_Functor["void"](Control_Monad_Except_Trans.functorExceptT(Effect_Aff.functorAff))(Effect_Aff_Class.liftAff(Effect_Aff_Class.monadAffExceptT(Effect_Aff_Class.monadAffAff))(Effect_Aff.joinFiber(v.value1)));
               });
-          }));
-      }));
-  })();
+          })));
+      };
+  };
+  var main = runProgram(Control_Bind.discardUnit)(Control_Bind.discard(Control_Bind.discardUnit)(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff)))(Spotify.togglePlayback)(function () {
+      return Spotify.togglePlayback;
+  }));
   exports["config"] = config;
   exports["main"] = main;
+  exports["runProgram"] = runProgram;
 })(PS);
 PS["Main"].main();
