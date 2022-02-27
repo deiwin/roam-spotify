@@ -1,16 +1,15 @@
 module Spotify
-  ( Token
-  , PlaybackState(..)
-  , getPlaybackState
-  , togglePlayback
-  , GetAccessTokenResponse(..)
-  , getAccessToken
+  ( togglePlayback
+  , Config(..)
+  , withToken
+  , Env(..)
+  , TokenResponse(..)
   ) where
 
 import Prelude
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Console (log, warn)
-import Effect.Aff (Aff)
+import Effect.Aff (Aff, delay, forkAff, Fiber)
 import Effect.Aff.Class (liftAff)
 import Affjax as AX
 import Affjax (Request, Response)
@@ -22,16 +21,17 @@ import Data.Either (Either(..))
 import Data.MediaType.Common (applicationJSON, applicationFormURLEncoded)
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:), printJsonDecodeError)
 import Data.Bifunctor (lmap)
-import Control.Monad.Except (ExceptT, except, mapExceptT, throwError)
+import Control.Monad.Except (ExceptT, except, mapExceptT, throwError, runExceptT)
+import Control.Monad.Reader (ReaderT, ask, mapReaderT)
+import Control.Monad.Trans.Class (lift)
 import Data.HTTP.Method (Method(PUT, POST))
 import Data.String.Base64 as B64
 import Data.FormURLEncoded as FUE
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
-import Data.Time.Duration (Milliseconds(..), Seconds(..))
-
-type Token
-  = String
+import Data.Time.Duration (Milliseconds(..), Seconds(..), Minutes(..), fromDuration, negateDuration)
+import Effect.Ref (Ref, read, write)
+import Effect.Ref (new) as Ref
 
 data PlaybackState
   = PlaybackState
@@ -46,18 +46,26 @@ instance decodeJsonPlaybackState :: DecodeJson PlaybackState where
     isPlaying <- obj .: "is_playing"
     pure $ PlaybackState { progress, isPlaying }
 
-getPlaybackState :: Token -> ExceptT String Aff PlaybackState
-getPlaybackState token =
+getToken :: ReaderT Env (ExceptT String Aff) String
+getToken = do
+  (Env env) <- ask
+  (TokenResponse tokenResponse) <- liftEffect $ read env.tokenResponseRef
+  pure $ tokenResponse.accessToken
+
+getPlaybackState :: ReaderT Env (ExceptT String Aff) PlaybackState
+getPlaybackState =
   logResult' do
-    response <- request req
+    token <- getToken
+    response <- lift $ request (req token)
     when (response.status == StatusCode 204) (throwError "Received empty playback state")
     decodeJson response.body
       # lmap printJsonDecodeError
       # except
+      # lift
   where
-  logResult' = logResult "get playback state"
+  logResult' = mapReaderT (logResult "get playback state")
 
-  req =
+  req token =
     AX.defaultRequest
       { url = "https://api.spotify.com/v1/me/player"
       , headers =
@@ -67,15 +75,15 @@ getPlaybackState token =
       , responseFormat = json
       }
 
-pausePlayback :: Token -> ExceptT String Aff Unit
-pausePlayback token =
-  request req
-    # void
-    # logResult'
+pausePlayback :: ReaderT Env (ExceptT String Aff) Unit
+pausePlayback =
+  logResult' do
+    token <- getToken
+    void $ lift $ request $ req token
   where
-  logResult' = logResult "pause playback"
+  logResult' = mapReaderT (logResult "pause playback")
 
-  req =
+  req token =
     AX.defaultRequest
       { url = "https://api.spotify.com/v1/me/player/pause"
       , method = Left PUT
@@ -86,15 +94,15 @@ pausePlayback token =
       , responseFormat = json
       }
 
-resumePlayback :: Token -> ExceptT String Aff Unit
-resumePlayback token =
-  request req
-    # void
-    # logResult'
+resumePlayback :: ReaderT Env (ExceptT String Aff) Unit
+resumePlayback =
+  logResult' do
+    token <- getToken
+    void $ lift $ request $ req token
   where
-  logResult' = logResult "resume playback"
+  logResult' = mapReaderT (logResult "resume playback")
 
-  req =
+  req token =
     AX.defaultRequest
       { url = "https://api.spotify.com/v1/me/player/play"
       , method = Left PUT
@@ -105,29 +113,29 @@ resumePlayback token =
       , responseFormat = json
       }
 
-togglePlayback :: Token -> ExceptT String Aff Unit
-togglePlayback token = do
-  (PlaybackState playbackState) <- getPlaybackState token
+togglePlayback :: ReaderT Env (ExceptT String Aff) Unit
+togglePlayback = do
+  (PlaybackState playbackState) <- getPlaybackState
   if playbackState.isPlaying then
-    pausePlayback token
+    pausePlayback
   else
-    resumePlayback token
+    resumePlayback
 
-data GetAccessTokenResponse
-  = GetAccessTokenResponse
+data TokenResponse
+  = TokenResponse
     { accessToken :: String
     , expiresIn :: Seconds
     }
 
-instance decodeJsonGetAccessTokenResponse :: DecodeJson GetAccessTokenResponse where
+instance decodeJsonGetAccessTokenResponse :: DecodeJson TokenResponse where
   decodeJson json = do
     obj <- decodeJson json
     accessToken <- obj .: "access_token"
     expiresIn <- Seconds <$> obj .: "expires_in"
-    pure $ GetAccessTokenResponse { accessToken, expiresIn }
+    pure $ TokenResponse { accessToken, expiresIn }
 
-getAccessToken :: String -> String -> String -> ExceptT String Aff GetAccessTokenResponse
-getAccessToken clientID clientSecret refreshToken =
+getAccessToken :: Config -> ExceptT String Aff TokenResponse
+getAccessToken (Config config) =
   logResult' do
     response <- request req
     decodeJson response.body
@@ -142,7 +150,7 @@ getAccessToken clientID clientSecret refreshToken =
       , method = Left POST
       , headers =
         [ ContentType applicationFormURLEncoded
-        , RequestHeader "Authorization" ("Basic " <> B64.encode (clientID <> ":" <> clientSecret))
+        , RequestHeader "Authorization" ("Basic " <> B64.encode (config.clientID <> ":" <> config.clientSecret))
         ]
       , responseFormat = json
       , content =
@@ -150,11 +158,50 @@ getAccessToken clientID clientSecret refreshToken =
           ( FormURLEncoded
               ( FUE.fromArray
                   [ Tuple "grant_type" (Just "refresh_token")
-                  , Tuple "refresh_token" (Just refreshToken)
+                  , Tuple "refresh_token" (Just config.refreshToken)
                   ]
               )
           )
       }
+
+data Config
+  = Config
+    { clientID :: String
+    , clientSecret :: String
+    , refreshToken :: String
+    }
+
+data Env
+  = Env
+    { tokenResponseRef :: Ref TokenResponse
+    }
+
+refreshTokenIndefinitely :: Config -> Ref TokenResponse -> ExceptT String Aff Unit
+refreshTokenIndefinitely config tokenResponseRef = do
+  curResponse <- liftEffect $ read tokenResponseRef
+  liftEffect $ log ("Refreshing acccess token after " <> show (delayDuration curResponse))
+  liftAff (delay (delayDuration curResponse))
+  liftEffect $ log $ "Refreshing acccess token"
+  newResp <- getAccessToken config
+  liftEffect $ write newResp tokenResponseRef
+  refreshTokenIndefinitely config tokenResponseRef
+  where
+  delayDuration :: TokenResponse -> Milliseconds
+  delayDuration (TokenResponse resp) =
+    resp.expiresIn
+      # fromDuration
+      # (_ <> negateDuration (fromDuration (Minutes 5.0)))
+
+withToken :: Config -> ExceptT String Aff (Tuple Env (Fiber (Either String Unit)))
+withToken config = do
+  initialResponse <- getAccessToken config
+  tokenResponseRef <- liftEffect $ Ref.new initialResponse
+  infiniteFiber <-
+    refreshTokenIndefinitely config tokenResponseRef
+      # runExceptT
+      # forkAff
+      # liftAff
+  pure (Tuple (Env { tokenResponseRef }) infiniteFiber)
 
 request :: forall a. Request a -> ExceptT String Aff (Response a)
 request req = do
@@ -168,7 +215,13 @@ request req = do
       | x >= 200 && x < 300 -> pure response
       | otherwise -> throwError "Expected a 2xx response code"
 
-logResult :: forall m a. Bind m => MonadEffect m => String -> ExceptT String m a -> ExceptT String m a
+logResult ::
+  forall m a.
+  Bind m =>
+  MonadEffect m =>
+  String ->
+  ExceptT String m a ->
+  ExceptT String m a
 logResult description =
   mapExceptT
     ( _
