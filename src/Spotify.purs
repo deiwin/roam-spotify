@@ -217,7 +217,6 @@ request req = do
 
 logResult ::
   forall m a.
-  Bind m =>
   MonadEffect m =>
   String ->
   ExceptT String m a ->
