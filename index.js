@@ -5309,10 +5309,10 @@ var PS = {};
 (function(exports) {
   "use strict";
 
-  exports._getFocusedBlock = just => nothing => () => {
-    const focusedBlock = window.roamAlphaAPI.ui.getFocusedBlock();
-    if (focusedBlock) {
-      return just(focusedBlock);
+  exports._getFocusedBlockMetadata = just => nothing => () => {
+    const focusedBlockMetadata = window.roamAlphaAPI.ui.getFocusedBlock();
+    if (focusedBlockMetadata) {
+      return just(focusedBlockMetadata);
     } else {
       return nothing;
     }
@@ -5337,25 +5337,25 @@ var PS = {};
   var Data_Show_Generic = $PS["Data.Show.Generic"];
   var Effect = $PS["Effect"];
   var Effect_Class = $PS["Effect.Class"];                
-  var Block = (function () {
-      function Block(value0) {
+  var FocusedBlockMetadata = (function () {
+      function FocusedBlockMetadata(value0) {
           this.value0 = value0;
       };
-      Block.create = function (value0) {
-          return new Block(value0);
+      FocusedBlockMetadata.create = function (value0) {
+          return new FocusedBlockMetadata(value0);
       };
-      return Block;
+      return FocusedBlockMetadata;
   })();
-  var genericBlock = {
+  var genericFocusedBlockMetadata = {
       to: function (x) {
-          return new Block(x);
+          return new FocusedBlockMetadata(x);
       },
       from: function (x) {
           return x.value0;
       }
   };
-  var showBlock = {
-      show: Data_Show_Generic.genericShow(genericBlock)(Data_Show_Generic.genericShowConstructor(Data_Show_Generic.genericShowArgsArgument(Data_Show.showRecord()(Data_Show.showRecordFieldsCons({
+  var showFocusedBlockMetadata = {
+      show: Data_Show_Generic.genericShow(genericFocusedBlockMetadata)(Data_Show_Generic.genericShowConstructor(Data_Show_Generic.genericShowArgsArgument(Data_Show.showRecord()(Data_Show.showRecordFieldsCons({
           reflectSymbol: function () {
               return "blockUid";
           }
@@ -5365,16 +5365,16 @@ var PS = {};
           }
       })(Data_Show.showRecordFieldsNil)(Data_Show.showString))(Data_Show.showString))))({
           reflectSymbol: function () {
-              return "Block";
+              return "FocusedBlockMetadata";
           }
       }))
   };
-  var decodeJsonBlock = {
+  var decodeJsonFocusedBlockMetadata = {
       decodeJson: function (json) {
           return Control_Bind.bind(Data_Either.bindEither)(Data_Argonaut_Decode_Class.decodeJson(Data_Argonaut_Decode_Class.decodeForeignObject(Data_Argonaut_Decode_Class.decodeJsonJson))(json))(function (obj) {
               return Control_Bind.bind(Data_Either.bindEither)(Data_Argonaut_Decode_Combinators.getField(Data_Argonaut_Decode_Class.decodeJsonString)(obj)("window-id"))(function (windowId) {
                   return Control_Bind.bind(Data_Either.bindEither)(Data_Argonaut_Decode_Combinators.getField(Data_Argonaut_Decode_Class.decodeJsonString)(obj)("block-uid"))(function (blockUid) {
-                      return Control_Applicative.pure(Data_Either.applicativeEither)(new Block({
+                      return Control_Applicative.pure(Data_Either.applicativeEither)(new FocusedBlockMetadata({
                           windowId: windowId,
                           blockUid: blockUid
                       }));
@@ -5383,17 +5383,17 @@ var PS = {};
           });
       }
   };
-  var getFocusedBlock = Control_Bind.bind(Control_Monad_Except_Trans.bindExceptT(Effect.monadEffect))(Effect_Class.liftEffect(Control_Monad_Except_Trans.monadEffectExceptT(Effect_Class.monadEffectEffect))($foreign["_getFocusedBlock"](Data_Maybe.Just.create)(Data_Maybe.Nothing.value)))(function (blockJsonMaybe) {
+  var getFocusedBlockMetadata = Control_Bind.bind(Control_Monad_Except_Trans.bindExceptT(Effect.monadEffect))(Effect_Class.liftEffect(Control_Monad_Except_Trans.monadEffectExceptT(Effect_Class.monadEffectEffect))($foreign["_getFocusedBlockMetadata"](Data_Maybe.Just.create)(Data_Maybe.Nothing.value)))(function (blockJsonMaybe) {
       if (blockJsonMaybe instanceof Data_Maybe.Just) {
-          return Control_Monad_Except_Trans.except(Effect.applicativeEffect)(Data_Bifunctor.lmap(Data_Bifunctor.bifunctorEither)(Data_Argonaut_Decode_Error.printJsonDecodeError)(Data_Functor.map(Data_Either.functorEither)(Data_Maybe.Just.create)(Data_Argonaut_Decode_Class.decodeJson(decodeJsonBlock)(blockJsonMaybe.value0))));
+          return Control_Monad_Except_Trans.except(Effect.applicativeEffect)(Data_Bifunctor.lmap(Data_Bifunctor.bifunctorEither)(Data_Argonaut_Decode_Error.printJsonDecodeError)(Data_Functor.map(Data_Either.functorEither)(Data_Maybe.Just.create)(Data_Argonaut_Decode_Class.decodeJson(decodeJsonFocusedBlockMetadata)(blockJsonMaybe.value0))));
       };
       if (blockJsonMaybe instanceof Data_Maybe.Nothing) {
           return Control_Applicative.pure(Control_Monad_Except_Trans.applicativeExceptT(Effect.monadEffect))(Data_Maybe.Nothing.value);
       };
       throw new Error("Failed pattern match at Roam (line 22, column 3 - line 29, column 28): " + [ blockJsonMaybe.constructor.name ]);
   });
-  exports["getFocusedBlock"] = getFocusedBlock;
-  exports["showBlock"] = showBlock;
+  exports["getFocusedBlockMetadata"] = getFocusedBlockMetadata;
+  exports["showFocusedBlockMetadata"] = showFocusedBlockMetadata;
 })(PS);
 (function($PS) {
   "use strict";
@@ -5732,8 +5732,8 @@ var PS = {};
   };
   var main = runProgram(Control_Bind.discardUnit)(Control_Bind.discard(Control_Bind.discardUnit)(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff)))(Spotify.togglePlayback)(function () {
       return Control_Bind.discard(Control_Bind.discardUnit)(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff)))(Spotify.togglePlayback)(function () {
-          return Control_Bind.bind(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff)))(Control_Monad_Trans_Class.lift(Control_Monad_Reader_Trans.monadTransReaderT)(Control_Monad_Except_Trans.monadExceptT(Effect_Aff.monadAff))(Control_Monad_Except_Trans.mapExceptT(Effect_Class.liftEffect(Effect_Aff.monadEffectAff))(Roam.getFocusedBlock)))(function (focusedBlock) {
-              return Effect_Class.liftEffect(Control_Monad_Reader_Trans.monadEffectReader(Control_Monad_Except_Trans.monadEffectExceptT(Effect_Aff.monadEffectAff)))(Effect_Console.logShow(Data_Maybe.showMaybe(Roam.showBlock))(focusedBlock));
+          return Control_Bind.bind(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Except_Trans.bindExceptT(Effect_Aff.monadAff)))(Control_Monad_Trans_Class.lift(Control_Monad_Reader_Trans.monadTransReaderT)(Control_Monad_Except_Trans.monadExceptT(Effect_Aff.monadAff))(Control_Monad_Except_Trans.mapExceptT(Effect_Class.liftEffect(Effect_Aff.monadEffectAff))(Roam.getFocusedBlockMetadata)))(function (focusedBlockMetadata) {
+              return Effect_Class.liftEffect(Control_Monad_Reader_Trans.monadEffectReader(Control_Monad_Except_Trans.monadEffectExceptT(Effect_Aff.monadEffectAff)))(Effect_Console.logShow(Data_Maybe.showMaybe(Roam.showFocusedBlockMetadata))(focusedBlockMetadata));
           });
       });
   }));

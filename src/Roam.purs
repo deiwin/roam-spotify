@@ -1,6 +1,6 @@
 module Roam
-  ( getFocusedBlock
-  , Block(..)
+  ( getFocusedBlockMetadata
+  , FocusedBlockMetadata(..)
   ) where
 
 import Prelude
@@ -14,11 +14,11 @@ import Data.Show.Generic (genericShow)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 
-foreign import _getFocusedBlock :: (forall x. x -> Maybe x) -> (forall x. Maybe x) -> Effect (Maybe Json)
+foreign import _getFocusedBlockMetadata :: (forall x. x -> Maybe x) -> (forall x. Maybe x) -> Effect (Maybe Json)
 
-getFocusedBlock :: ExceptT String Effect (Maybe Block)
-getFocusedBlock = do
-  blockJsonMaybe <- liftEffect $ _getFocusedBlock Just Nothing
+getFocusedBlockMetadata :: ExceptT String Effect (Maybe FocusedBlockMetadata)
+getFocusedBlockMetadata = do
+  blockJsonMaybe <- liftEffect $ _getFocusedBlockMetadata Just Nothing
   case blockJsonMaybe of
     Just blockJson ->
       blockJson
@@ -28,20 +28,20 @@ getFocusedBlock = do
         # except
     Nothing -> pure Nothing
 
-data Block
-  = Block
+data FocusedBlockMetadata
+  = FocusedBlockMetadata
     { windowId :: String
     , blockUid :: String
     }
 
-derive instance genericBlock :: Generic Block _
+derive instance genericFocusedBlockMetadata :: Generic FocusedBlockMetadata _
 
-instance showBlock :: Show Block where
+instance showFocusedBlockMetadata :: Show FocusedBlockMetadata where
   show = genericShow
 
-instance decodeJsonBlock :: DecodeJson Block where
+instance decodeJsonFocusedBlockMetadata :: DecodeJson FocusedBlockMetadata where
   decodeJson json = do
     obj <- decodeJson json
     windowId <- obj .: "window-id"
     blockUid <- obj .: "block-uid"
-    pure $ Block { windowId, blockUid }
+    pure $ FocusedBlockMetadata { windowId, blockUid }

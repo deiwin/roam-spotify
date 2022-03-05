@@ -10,7 +10,7 @@ import Effect.Aff (Aff, launchAff_, joinFiber)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Console (logShow)
-import Roam (getFocusedBlock)
+import Roam (getFocusedBlockMetadata)
 import Spotify (togglePlayback, withToken, Config(..), Env)
 
 config :: Config
@@ -26,8 +26,8 @@ main =
   runProgram do
     togglePlayback
     togglePlayback
-    focusedBlock <- lift $ mapExceptT liftEffect getFocusedBlock
-    liftEffect $ logShow focusedBlock
+    focusedBlockMetadata <- lift $ mapExceptT liftEffect getFocusedBlockMetadata
+    liftEffect $ logShow focusedBlockMetadata
 
 runProgram :: forall a. Discard a => ReaderT Env (ExceptT String Aff) a -> Effect Unit
 runProgram program =

@@ -1,9 +1,9 @@
 "use strict";
 
-exports._getFocusedBlock = just => nothing => () => {
-  const focusedBlock = window.roamAlphaAPI.ui.getFocusedBlock();
-  if (focusedBlock) {
-    return just(focusedBlock);
+exports._getFocusedBlockMetadata = just => nothing => () => {
+  const focusedBlockMetadata = window.roamAlphaAPI.ui.getFocusedBlock();
+  if (focusedBlockMetadata) {
+    return just(focusedBlockMetadata);
   } else {
     return nothing;
   }
