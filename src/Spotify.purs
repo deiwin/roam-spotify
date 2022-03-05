@@ -1,5 +1,8 @@
 module Spotify
   ( togglePlayback
+  , getPlaybackState
+  , PlaybackState(..)
+  , timestamp
   , module ExportAuth
   ) where
 
@@ -12,11 +15,15 @@ import Control.Monad.Except (ExceptT, except, throwError)
 import Control.Monad.Reader (ReaderT, mapReaderT)
 import Control.Monad.Trans.Class (lift)
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:), printJsonDecodeError)
+import Data.Array (replicate)
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(PUT))
+import Data.Int (round)
 import Data.MediaType.Common (applicationJSON)
-import Data.Time.Duration (Milliseconds(..))
+import Data.String (length)
+import Data.String.CodeUnits (fromCharArray)
+import Data.Time.Duration (Hours(..), Milliseconds(..), Minutes(..), Seconds(..), toDuration)
 import Effect.Aff (Aff)
 import Spotify.Auth (getToken, Env)
 import Spotify.Auth (withToken, Config(..), Env(..), TokenResponse(..)) as ExportAuth
@@ -58,6 +65,32 @@ togglePlayback = do
     pausePlayback
   else
     resumePlayback
+
+timestamp :: PlaybackState -> String
+timestamp (PlaybackState playbackState) =
+  (format identity hours)
+    <> ":"
+    <> (format (_ `mod` 60) minutes)
+    <> ":"
+    <> (format (_ `mod` 60) seconds)
+  where
+  (Hours hours) = toDuration playbackState.progress
+
+  (Minutes minutes) = toDuration playbackState.progress
+
+  (Seconds seconds) = toDuration playbackState.progress
+
+  format :: (Int -> Int) -> Number -> String
+  format f = round >>> f >>> show >>> leftPad 2 '0'
+
+  leftPad :: Int -> Char -> String -> String
+  leftPad minCount char string
+    | length string >= minCount = string
+    | otherwise =
+      minCount - (length string)
+        # flip replicate char
+        # fromCharArray
+        # (_ <> string)
 
 pausePlayback :: ReaderT Env (ExceptT String Aff) Unit
 pausePlayback =

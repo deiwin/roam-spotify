@@ -12,7 +12,7 @@ import Effect.Aff (Aff, launchAff_, joinFiber)
 import Effect.Class (liftEffect)
 import Effect.Console (warn)
 import Roam (updateFocusedBlockString)
-import Spotify (togglePlayback, withToken, Config(..), Env)
+import Spotify (getPlaybackState, timestamp, togglePlayback, withToken, Config(..), Env)
 
 config :: Config
 config =
@@ -27,10 +27,15 @@ main =
   runProgram do
     togglePlayback
     togglePlayback
-    updateFocusedBlockString (\s -> "prefix " <> s)
-      # mapExceptT liftEffect
-      # flip catchError (\e -> throwError ("Failed to update focused block: " <> e))
-      # lift
+    prefixFocusedBlockWithCurTimestamp
+
+prefixFocusedBlockWithCurTimestamp :: ReaderT Env (ExceptT String Aff) Unit
+prefixFocusedBlockWithCurTimestamp = do
+  playbackState <- getPlaybackState
+  updateFocusedBlockString (\s -> timestamp playbackState <> " " <> s)
+    # mapExceptT liftEffect
+    # flip catchError (\e -> throwError ("Failed to update focused block: " <> e))
+    # lift
 
 runProgram :: forall a. Discard a => ReaderT Env (ExceptT String Aff) a -> Effect Unit
 runProgram program =
