@@ -4,16 +4,16 @@ module Spotify.Util
   ) where
 
 import Prelude
-import Effect.Class (class MonadEffect, liftEffect)
-import Effect.Console (log, warn)
+import Affjax (Request, Response)
+import Affjax as AX
+import Affjax.StatusCode (StatusCode(..))
+import Control.Monad.Except (ExceptT, except, mapExceptT, throwError)
+import Data.Bifunctor (lmap)
+import Data.Either (Either(..))
 import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
-import Affjax as AX
-import Affjax (Request, Response)
-import Affjax.StatusCode (StatusCode(..))
-import Data.Either (Either(..))
-import Data.Bifunctor (lmap)
-import Control.Monad.Except (ExceptT, except, mapExceptT, throwError)
+import Effect.Class (class MonadEffect, liftEffect)
+import Effect.Console (log, warn)
 
 request :: forall a. Request a -> ExceptT String Aff (Response a)
 request req = do

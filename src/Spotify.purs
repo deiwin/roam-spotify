@@ -4,23 +4,23 @@ module Spotify
   ) where
 
 import Prelude
-import Effect.Aff (Aff)
 import Affjax as AX
 import Affjax.RequestHeader (RequestHeader(..))
 import Affjax.ResponseFormat (json)
 import Affjax.StatusCode (StatusCode(..))
-import Data.Either (Either(..))
-import Data.MediaType.Common (applicationJSON)
-import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:), printJsonDecodeError)
-import Data.Bifunctor (lmap)
 import Control.Monad.Except (ExceptT, except, throwError)
 import Control.Monad.Reader (ReaderT, mapReaderT)
 import Control.Monad.Trans.Class (lift)
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:), printJsonDecodeError)
+import Data.Bifunctor (lmap)
+import Data.Either (Either(..))
 import Data.HTTP.Method (Method(PUT))
+import Data.MediaType.Common (applicationJSON)
 import Data.Time.Duration (Milliseconds(..))
-import Spotify.Util (request, logResult)
+import Effect.Aff (Aff)
 import Spotify.Auth (getToken, Env)
 import Spotify.Auth (withToken, Config(..), Env(..), TokenResponse(..)) as ExportAuth
+import Spotify.Util (request, logResult)
 
 data PlaybackState
   = PlaybackState

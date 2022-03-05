@@ -7,26 +7,26 @@ module Spotify.Auth
   ) where
 
 import Prelude
-import Effect.Class (liftEffect)
-import Effect.Console (log)
-import Effect.Aff (Aff, delay, forkAff, Fiber)
-import Effect.Aff.Class (liftAff)
 import Affjax as AX
+import Affjax.RequestBody (RequestBody(FormURLEncoded))
 import Affjax.RequestHeader (RequestHeader(..))
 import Affjax.ResponseFormat (json)
-import Affjax.RequestBody (RequestBody(FormURLEncoded))
-import Data.Either (Either(..))
-import Data.MediaType.Common (applicationFormURLEncoded)
-import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:), printJsonDecodeError)
-import Data.Bifunctor (lmap)
 import Control.Monad.Except (ExceptT, except, runExceptT)
 import Control.Monad.Reader (ReaderT, ask)
-import Data.HTTP.Method (Method(POST))
-import Data.String.Base64 as B64
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:), printJsonDecodeError)
+import Data.Bifunctor (lmap)
+import Data.Either (Either(..))
 import Data.FormURLEncoded as FUE
+import Data.HTTP.Method (Method(POST))
 import Data.Maybe (Maybe(..))
-import Data.Tuple (Tuple(..))
+import Data.MediaType.Common (applicationFormURLEncoded)
+import Data.String.Base64 as B64
 import Data.Time.Duration (Milliseconds, Seconds(..), Minutes(..), fromDuration, negateDuration)
+import Data.Tuple (Tuple(..))
+import Effect.Aff (Aff, delay, forkAff, Fiber)
+import Effect.Aff.Class (liftAff)
+import Effect.Class (liftEffect)
+import Effect.Console (log)
 import Effect.Ref (Ref, read, write)
 import Effect.Ref (new) as Ref
 import Spotify.Util (request, logResult)
