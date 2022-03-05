@@ -8,3 +8,11 @@ exports._getFocusedBlockMetadata = just => nothing => () => {
     return nothing;
   }
 };
+
+exports._findBlock = uid => () =>
+  window.roamAlphaAPI
+    .data
+    .q(`[:find (pull ?e [*])
+         :in $ ?uid
+         :where [?e :block/uid ?uid]
+        ]`, uid);

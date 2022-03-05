@@ -19,6 +19,7 @@ to generate this file without the comments in this block.
   , "b64"
   , "bifunctors"
   , "console"
+  , "control"
   , "datetime"
   , "effect"
   , "either"
