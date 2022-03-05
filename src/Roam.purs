@@ -1,11 +1,9 @@
 module Roam
-  ( getFocusedBlockMetadata
-  , FocusedBlockMetadata(..)
-  , findBlock
-  , Block(..)
+  ( updateFocusedBlockString
   ) where
 
 import Prelude
+import Control.Monad.Error.Class (class MonadThrow)
 import Control.Monad.Except (ExceptT, except, throwError)
 import Control.Monad.Maybe.Trans (runMaybeT)
 import Control.Plus (empty)
@@ -18,10 +16,36 @@ import Data.Maybe (Maybe(..))
 import Data.Show.Generic (genericShow)
 import Effect (Effect)
 import Effect.Class (liftEffect)
+import Effect.Console (log)
+
+type Uid
+  = String
+
+data Block
+  = Block
+    { id :: Int
+    , string :: String
+    }
+
+data FocusedBlockMetadata
+  = FocusedBlockMetadata
+    { windowId :: String
+    , blockUid :: Uid
+    }
 
 foreign import _getFocusedBlockMetadata :: (forall x. x -> Maybe x) -> (forall x. Maybe x) -> Effect (Maybe Json)
 
-foreign import _findBlock :: String -> Effect Json
+foreign import _findBlock :: Uid -> Effect Json
+
+foreign import setBlockString :: String -> Uid -> Effect Unit
+
+updateFocusedBlockString :: (String -> String) -> ExceptT String Effect Unit
+updateFocusedBlockString f = do
+  (FocusedBlockMetadata focusedBlockMetadata) <-
+    getFocusedBlockMetadata
+      >>= note "No block is currently focused"
+  liftEffect $ log ("Will update focused block with uid " <> focusedBlockMetadata.blockUid)
+  updateBlockString f (focusedBlockMetadata.blockUid)
 
 getFocusedBlockMetadata :: ExceptT String Effect (Maybe FocusedBlockMetadata)
 getFocusedBlockMetadata = do
@@ -35,7 +59,7 @@ getFocusedBlockMetadata = do
         # except
     Nothing -> pure Nothing
 
-findBlock :: String -> ExceptT String Effect (Maybe Block)
+findBlock :: Uid -> ExceptT String Effect (Maybe Block)
 findBlock uid = do
   json <- liftEffect $ _findBlock uid
   json
@@ -56,10 +80,25 @@ findBlock uid = do
         [ x ] -> pure x
         _ -> throwError "Expecting a single element in nested array"
 
-data Block
-  = Block
-    { id :: Int
-    }
+updateBlockString :: (String -> String) -> Uid -> ExceptT String Effect Unit
+updateBlockString f uid = do
+  (Block block) <-
+    findBlock uid
+      >>= note ("Did not find a block with uid: " <> uid)
+  let
+    logMetadata =
+      { uid: uid
+      , currentMessage: block.string
+      , newMessage: f block.string
+      }
+  liftEffect $ log ("Found block to update " <> show (logMetadata))
+  liftEffect $ setBlockString (f block.string) uid
+  liftEffect $ log "Block updated"
+
+note :: forall e m a. MonadThrow e m => e -> Maybe a -> m a
+note e = case _ of
+  Nothing -> throwError e
+  Just x -> pure x
 
 derive instance genericBlock :: Generic Block _
 
@@ -70,13 +109,8 @@ instance decodeJsonBlock :: DecodeJson Block where
   decodeJson json = do
     obj <- decodeJson json
     id <- obj .: "id"
-    pure $ Block { id }
-
-data FocusedBlockMetadata
-  = FocusedBlockMetadata
-    { windowId :: String
-    , blockUid :: String
-    }
+    string <- obj .: "string"
+    pure $ Block { id, string }
 
 derive instance genericFocusedBlockMetadata :: Generic FocusedBlockMetadata _
 

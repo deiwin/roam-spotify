@@ -16,3 +16,13 @@ exports._findBlock = uid => () =>
          :in $ ?uid
          :where [?e :block/uid ?uid]
         ]`, uid);
+
+exports.setBlockString = string => uid => () => {
+  window.roamAlphaAPI
+    .data
+    .block
+    .update({block: {
+      uid: uid,
+      string: string,
+    }});
+};

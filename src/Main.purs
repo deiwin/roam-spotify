@@ -1,17 +1,17 @@
 module Main where
 
 import Prelude
+import Control.Monad.Error.Class (throwError, catchError)
 import Control.Monad.Except (ExceptT, mapExceptT, runExceptT)
 import Control.Monad.Reader (ReaderT, runReaderT)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_, joinFiber)
 import Effect.Class (liftEffect)
-import Effect.Console (log, logShow, warn)
-import Roam (getFocusedBlockMetadata, FocusedBlockMetadata(..), findBlock)
+import Effect.Console (warn)
+import Roam (updateFocusedBlockString)
 import Spotify (togglePlayback, withToken, Config(..), Env)
 
 config :: Config
@@ -27,13 +27,10 @@ main =
   runProgram do
     togglePlayback
     togglePlayback
-    maybeFocusedBlockMetadata <- lift $ mapExceptT liftEffect getFocusedBlockMetadata
-    liftEffect $ logShow maybeFocusedBlockMetadata
-    case maybeFocusedBlockMetadata of
-      Nothing -> liftEffect $ log "No block is focused"
-      Just (FocusedBlockMetadata focusedBlockMetadata) -> do
-        focusedBlock <- lift $ mapExceptT liftEffect $ findBlock focusedBlockMetadata.blockUid
-        liftEffect $ logShow focusedBlock
+    updateFocusedBlockString (\s -> "prefix " <> s)
+      # mapExceptT liftEffect
+      # flip catchError (\e -> throwError ("Failed to update focused block: " <> e))
+      # lift
 
 runProgram :: forall a. Discard a => ReaderT Env (ExceptT String Aff) a -> Effect Unit
 runProgram program =
